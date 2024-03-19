@@ -6,6 +6,7 @@
 #include <cassert>
 #include <ostream>
 #include <sstream>
+#include <cstdint>
 
 namespace mshio {
 namespace v41 {

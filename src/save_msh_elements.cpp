@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cstdint>
 
 
 namespace mshio {

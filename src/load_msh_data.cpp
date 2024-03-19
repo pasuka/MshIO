@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iomanip>
 #include <string>
+#include <cstdint>
 
 namespace mshio {
 

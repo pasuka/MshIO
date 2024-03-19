@@ -14,6 +14,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <cstdint>
 
 
 namespace mshio {
