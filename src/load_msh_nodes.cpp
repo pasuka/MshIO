@@ -1,5 +1,6 @@
 #include "load_msh_nodes.h"
 #include "io_utils.h"
+#include "safe_math.h"
 
 #include <mshio/MshSpec.h>
 #include <mshio/exception.h>
@@ -22,6 +23,10 @@ void load_nodes_ascii(std::istream& in, MshSpec& spec)
     in >> nodes.min_node_tag;
     in >> nodes.max_node_tag;
     assert(in.good());
+    
+    safe_math::validate_size(nodes.num_entity_blocks, "v4.1 ASCII node blocks");
+    safe_math::validate_size(nodes.num_nodes, "v4.1 ASCII nodes");
+    
     nodes.entity_blocks.resize(nodes.num_entity_blocks);
     for (size_t i = 0; i < nodes.num_entity_blocks; i++) {
         NodeBlock& block = nodes.entity_blocks[i];
@@ -31,6 +36,8 @@ void load_nodes_ascii(std::istream& in, MshSpec& spec)
         in >> block.num_nodes_in_block;
         assert(in.good());
 
+        safe_math::validate_size(block.num_nodes_in_block, "v4.1 ASCII nodes in block");
+        
         block.tags.resize(block.num_nodes_in_block);
         for (size_t j = 0; j < block.num_nodes_in_block; j++) {
             in >> block.tags[j];
@@ -40,7 +47,11 @@ void load_nodes_ascii(std::istream& in, MshSpec& spec)
         assert(block.parametric >= 0 && block.parametric <= 3);
         const size_t entries_per_node =
             static_cast<size_t>(3 + ((block.parametric == 1) ? block.entity_dim : 0));
-        block.data.resize(block.num_nodes_in_block * entries_per_node);
+        size_t data_size = safe_math::safe_multiply(
+            block.num_nodes_in_block, 
+            entries_per_node,
+            "v4.1 ASCII node data allocation");
+        block.data.resize(data_size);
         for (size_t j = 0; j < block.num_nodes_in_block; j++) {
             for (size_t k = 0; k < entries_per_node; k++) {
                 in >> block.data[j * entries_per_node + k];
@@ -59,6 +70,10 @@ void load_nodes_binary(std::istream& in, MshSpec& spec)
     in.read(reinterpret_cast<char*>(&nodes.min_node_tag), sizeof(size_t));
     in.read(reinterpret_cast<char*>(&nodes.max_node_tag), sizeof(size_t));
     assert(in.good());
+    
+    safe_math::validate_size(nodes.num_entity_blocks, "v4.1 binary node blocks");
+    safe_math::validate_size(nodes.num_nodes, "v4.1 binary nodes");
+    
     nodes.entity_blocks.resize(nodes.num_entity_blocks);
     for (size_t i = 0; i < nodes.num_entity_blocks; i++) {
         NodeBlock& block = nodes.entity_blocks[i];
@@ -68,17 +83,25 @@ void load_nodes_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&block.num_nodes_in_block), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(block.num_nodes_in_block, "v4.1 binary nodes in block");
+
         block.tags.resize(block.num_nodes_in_block);
+        size_t tags_read_size = safe_math::safe_multiply(
+            sizeof(size_t), block.num_nodes_in_block, "node tags read");
         in.read(reinterpret_cast<char*>(block.tags.data()),
-            static_cast<std::streamsize>(sizeof(size_t) * block.num_nodes_in_block));
+            static_cast<std::streamsize>(tags_read_size));
         assert(in.good());
 
         const size_t entries_per_node =
             static_cast<size_t>(3 + ((block.parametric == 1) ? block.entity_dim : 0));
-        block.data.resize(block.num_nodes_in_block * entries_per_node);
+        size_t data_size = safe_math::safe_multiply(
+            block.num_nodes_in_block, 
+            entries_per_node,
+            "v4.1 binary node data allocation");
+        block.data.resize(data_size);
+        size_t data_read_size = safe_math::safe_multiply(sizeof(double), data_size, "node data read");
         in.read(reinterpret_cast<char*>(block.data.data()),
-            static_cast<std::streamsize>(
-                sizeof(double) * block.num_nodes_in_block * entries_per_node));
+            static_cast<std::streamsize>(data_read_size));
         assert(in.good());
     }
 }
@@ -99,6 +122,9 @@ void load_nodes_ascii(std::istream& in, MshSpec& spec)
     block.parametric = 0;
     in >> block.num_nodes_in_block;
     assert(in.good());
+    
+    safe_math::validate_size(block.num_nodes_in_block, "v2.2 ASCII nodes in block");
+    
     nodes.num_nodes += block.num_nodes_in_block;
 
     block.tags.resize(block.num_nodes_in_block);
@@ -131,6 +157,9 @@ void load_nodes_binary(std::istream& in, MshSpec& spec)
     block.parametric = 0;
     in >> block.num_nodes_in_block;
     assert(in.good());
+    
+    safe_math::validate_size(block.num_nodes_in_block, "v2.2 binary nodes in block");
+    
     nodes.num_nodes += block.num_nodes_in_block;
 
     block.tags.resize(block.num_nodes_in_block);

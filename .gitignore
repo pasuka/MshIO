@@ -1,4 +1,5 @@
 build*/
 _skbuild/
+_codeql*/
 *.egg-info/
 __pycache__/

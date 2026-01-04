@@ -1,4 +1,5 @@
 #include "io_utils.h"
+#include "safe_math.h"
 
 #include <mshio/MshSpec.h>
 #include <mshio/exception.h>
@@ -19,6 +20,11 @@ void load_entities_ascii(std::istream& in, MshSpec& spec)
     in >> num_volumes;
     assert(in.good());
 
+    safe_math::validate_size(num_points, "entity points");
+    safe_math::validate_size(num_curves, "entity curves");
+    safe_math::validate_size(num_surfaces, "entity surfaces");
+    safe_math::validate_size(num_volumes, "entity volumes");
+
     Entities& entities = spec.entities;
     entities.points.resize(num_points);
     entities.curves.resize(num_curves);
@@ -33,6 +39,7 @@ void load_entities_ascii(std::istream& in, MshSpec& spec)
         in >> point.z;
         size_t num_physical_groups;
         in >> num_physical_groups;
+        safe_math::validate_size(num_physical_groups, "point physical groups");
         point.physical_group_tags.resize(num_physical_groups);
         for (size_t j = 0; j < num_physical_groups; j++) {
             in >> point.physical_group_tags[j];
@@ -50,12 +57,14 @@ void load_entities_ascii(std::istream& in, MshSpec& spec)
         in >> curve.max_z;
         size_t num_physical_groups;
         in >> num_physical_groups;
+        safe_math::validate_size(num_physical_groups, "curve physical groups");
         curve.physical_group_tags.resize(num_physical_groups);
         for (size_t j = 0; j < num_physical_groups; j++) {
             in >> curve.physical_group_tags[j];
         }
         size_t num_boundary_points;
         in >> num_boundary_points;
+        safe_math::validate_size(num_boundary_points, "curve boundary points");
         curve.boundary_point_tags.resize(num_boundary_points);
         for (size_t j = 0; j < num_boundary_points; j++) {
             in >> curve.boundary_point_tags[j];
@@ -73,12 +82,14 @@ void load_entities_ascii(std::istream& in, MshSpec& spec)
         in >> surface.max_z;
         size_t num_physical_groups;
         in >> num_physical_groups;
+        safe_math::validate_size(num_physical_groups, "surface physical groups");
         surface.physical_group_tags.resize(num_physical_groups);
         for (size_t j = 0; j < num_physical_groups; j++) {
             in >> surface.physical_group_tags[j];
         }
         size_t num_boundary_curves;
         in >> num_boundary_curves;
+        safe_math::validate_size(num_boundary_curves, "surface boundary curves");
         surface.boundary_curve_tags.resize(num_boundary_curves);
         for (size_t j = 0; j < num_boundary_curves; j++) {
             in >> surface.boundary_curve_tags[j];
@@ -96,12 +107,14 @@ void load_entities_ascii(std::istream& in, MshSpec& spec)
         in >> volume.max_z;
         size_t num_physical_groups;
         in >> num_physical_groups;
+        safe_math::validate_size(num_physical_groups, "volume physical groups");
         volume.physical_group_tags.resize(num_physical_groups);
         for (size_t j = 0; j < num_physical_groups; j++) {
             in >> volume.physical_group_tags[j];
         }
         size_t num_boundary_surfaces;
         in >> num_boundary_surfaces;
+        safe_math::validate_size(num_boundary_surfaces, "volume boundary surfaces");
         volume.boundary_surface_tags.resize(num_boundary_surfaces);
         for (size_t j = 0; j < num_boundary_surfaces; j++) {
             in >> volume.boundary_surface_tags[j];
@@ -121,6 +134,11 @@ void load_entities_binary(std::istream& in, MshSpec& spec)
     in.read(reinterpret_cast<char*>(&num_volumes), sizeof(size_t));
     assert(in.good());
 
+    safe_math::validate_size(num_points, "binary entity points");
+    safe_math::validate_size(num_curves, "binary entity curves");
+    safe_math::validate_size(num_surfaces, "binary entity surfaces");
+    safe_math::validate_size(num_volumes, "binary entity volumes");
+
     Entities& entities = spec.entities;
     entities.points.resize(num_points);
     entities.curves.resize(num_curves);
@@ -137,9 +155,11 @@ void load_entities_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&num_physical_groups), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_physical_groups, "binary point physical groups");
         point.physical_group_tags.resize(num_physical_groups);
+        size_t read_size = safe_math::safe_multiply(sizeof(int), num_physical_groups, "point physical groups read");
         in.read(reinterpret_cast<char*>(point.physical_group_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_physical_groups));
+            static_cast<std::streamsize>(read_size));
         assert(in.good());
     }
 
@@ -156,18 +176,22 @@ void load_entities_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&num_physical_groups), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_physical_groups, "binary curve physical groups");
         curve.physical_group_tags.resize(num_physical_groups);
+        size_t pg_read_size = safe_math::safe_multiply(sizeof(int), num_physical_groups, "curve physical groups read");
         in.read(reinterpret_cast<char*>(curve.physical_group_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_physical_groups));
+            static_cast<std::streamsize>(pg_read_size));
         assert(in.good());
 
         size_t num_boundary_points;
         in.read(reinterpret_cast<char*>(&num_boundary_points), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_boundary_points, "binary curve boundary points");
         curve.boundary_point_tags.resize(num_boundary_points);
+        size_t bp_read_size = safe_math::safe_multiply(sizeof(int), num_boundary_points, "curve boundary points read");
         in.read(reinterpret_cast<char*>(curve.boundary_point_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_boundary_points));
+            static_cast<std::streamsize>(bp_read_size));
         assert(in.good());
     }
 
@@ -184,18 +208,22 @@ void load_entities_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&num_physical_groups), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_physical_groups, "binary surface physical groups");
         surface.physical_group_tags.resize(num_physical_groups);
+        size_t pg_read_size = safe_math::safe_multiply(sizeof(int), num_physical_groups, "surface physical groups read");
         in.read(reinterpret_cast<char*>(surface.physical_group_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_physical_groups));
+            static_cast<std::streamsize>(pg_read_size));
         assert(in.good());
 
         size_t num_boundary_curves;
         in.read(reinterpret_cast<char*>(&num_boundary_curves), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_boundary_curves, "binary surface boundary curves");
         surface.boundary_curve_tags.resize(num_boundary_curves);
+        size_t bc_read_size = safe_math::safe_multiply(sizeof(int), num_boundary_curves, "surface boundary curves read");
         in.read(reinterpret_cast<char*>(surface.boundary_curve_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_boundary_curves));
+            static_cast<std::streamsize>(bc_read_size));
         assert(in.good());
     }
 
@@ -212,18 +240,22 @@ void load_entities_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&num_physical_groups), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_physical_groups, "binary volume physical groups");
         volume.physical_group_tags.resize(num_physical_groups);
+        size_t pg_read_size = safe_math::safe_multiply(sizeof(int), num_physical_groups, "volume physical groups read");
         in.read(reinterpret_cast<char*>(volume.physical_group_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_physical_groups));
+            static_cast<std::streamsize>(pg_read_size));
         assert(in.good());
 
         size_t num_boundary_surfaces;
         in.read(reinterpret_cast<char*>(&num_boundary_surfaces), sizeof(size_t));
         assert(in.good());
 
+        safe_math::validate_size(num_boundary_surfaces, "binary volume boundary surfaces");
         volume.boundary_surface_tags.resize(num_boundary_surfaces);
+        size_t bs_read_size = safe_math::safe_multiply(sizeof(int), num_boundary_surfaces, "volume boundary surfaces read");
         in.read(reinterpret_cast<char*>(volume.boundary_surface_tags.data()),
-            static_cast<std::streamsize>(sizeof(int) * num_boundary_surfaces));
+            static_cast<std::streamsize>(bs_read_size));
         assert(in.good());
     }
 }
