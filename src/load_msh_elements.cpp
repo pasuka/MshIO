@@ -1,6 +1,7 @@
 #include "element_utils.h"
 #include "io_utils.h"
 #include "load_msh_format.h"
+#include "safe_math.h"
 
 #include <mshio/MshSpec.h>
 #include <mshio/exception.h>
@@ -30,6 +31,9 @@ void load_elements_ascii(std::istream& in, MshSpec& spec)
     in >> elements.max_element_tag;
     assert(in.good());
 
+    safe_math::validate_size(elements.num_entity_blocks, "v4.1 ASCII element blocks");
+    safe_math::validate_size(elements.num_elements, "v4.1 ASCII elements");
+    
     elements.entity_blocks.resize(elements.num_entity_blocks);
     for (size_t i = 0; i < elements.num_entity_blocks; i++) {
         ElementBlock& block = elements.entity_blocks[i];
@@ -39,8 +43,13 @@ void load_elements_ascii(std::istream& in, MshSpec& spec)
         in >> block.element_type;
         in >> block.num_elements_in_block;
 
+        safe_math::validate_size(block.num_elements_in_block, "v4.1 ASCII elements in block");
         const size_t n = nodes_per_element(block.element_type);
-        block.data.resize(block.num_elements_in_block * (n + 1));
+        size_t data_size = safe_math::safe_multiply(
+            block.num_elements_in_block, 
+            (n + 1),
+            "v4.1 ASCII element data allocation");
+        block.data.resize(data_size);
         for (size_t j = 0; j < block.num_elements_in_block; j++) {
             for (size_t k = 0; k <= n; k++) {
                 in >> block.data[j * (n + 1) + k];
@@ -60,6 +69,9 @@ void load_elements_binary(std::istream& in, MshSpec& spec)
     in.read(reinterpret_cast<char*>(&elements.max_element_tag), sizeof(size_t));
     assert(in.good());
 
+    safe_math::validate_size(elements.num_entity_blocks, "v4.1 binary element blocks");
+    safe_math::validate_size(elements.num_elements, "v4.1 binary elements");
+    
     elements.entity_blocks.resize(elements.num_entity_blocks);
     for (size_t i = 0; i < elements.num_entity_blocks; i++) {
         ElementBlock& block = elements.entity_blocks[i];
@@ -69,10 +81,16 @@ void load_elements_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&block.element_type), sizeof(int));
         in.read(reinterpret_cast<char*>(&block.num_elements_in_block), sizeof(size_t));
 
+        safe_math::validate_size(block.num_elements_in_block, "v4.1 binary elements in block");
         const size_t n = nodes_per_element(block.element_type);
-        block.data.resize(block.num_elements_in_block * (n + 1));
+        size_t data_size = safe_math::safe_multiply(
+            block.num_elements_in_block, 
+            (n + 1),
+            "v4.1 binary element data allocation");
+        block.data.resize(data_size);
+        size_t read_size = safe_math::safe_multiply(sizeof(size_t), block.data.size(), "element data read");
         in.read(reinterpret_cast<char*>(block.data.data()),
-            static_cast<std::streamsize>(sizeof(size_t) * block.data.size()));
+            static_cast<std::streamsize>(read_size));
         assert(in.good());
     }
 }
@@ -101,6 +119,8 @@ void load_elements_ascii(std::istream& in, MshSpec& spec)
     size_t num_elements;
     in >> num_elements;
 
+    safe_math::validate_size(num_elements, "v2.2 ASCII elements");
+
     // Due to v2.2 constraints, each element is parsed as a separate block, and
     // a regrouping will happen at post-processing time.
     elements.num_entity_blocks += num_elements;
@@ -117,6 +137,9 @@ void load_elements_ascii(std::istream& in, MshSpec& spec)
         in >> element_num;
         in >> element_type;
         in >> num_tags;
+        if (num_tags < 0) {
+            throw InvalidFormat("Negative num_tags in v2.2 ASCII elements");
+        }
         tags.resize(static_cast<size_t>(num_tags));
         for (int j = 0; j < num_tags; j++) {
             in >> tags[static_cast<size_t>(j)];
@@ -174,6 +197,7 @@ void load_elements_binary(std::istream& in, MshSpec& spec)
 {
     Elements& elements = spec.elements;
     in >> elements.num_elements;
+    safe_math::validate_size(elements.num_elements, "v2.2 binary elements");
     elements.entity_blocks.reserve(elements.num_elements);
     eat_white_space(in, 1);
 
@@ -189,6 +213,13 @@ void load_elements_binary(std::istream& in, MshSpec& spec)
         in.read(reinterpret_cast<char*>(&num_elements_in_block), 4);
         in.read(reinterpret_cast<char*>(&num_tags), 4);
 
+        if (num_elements_in_block < 0) {
+            throw InvalidFormat("Negative num_elements_in_block in v2.2 binary elements");
+        }
+        if (num_tags < 0) {
+            throw InvalidFormat("Negative num_tags in v2.2 binary elements");
+        }
+
         tags.resize(static_cast<size_t>(num_tags));
 
         const size_t n = nodes_per_element(element_type);
@@ -196,10 +227,12 @@ void load_elements_binary(std::istream& in, MshSpec& spec)
 
         // Due to v2.2 constraints, each element is parsed as a separate block, and
         // a regrouping will happen at post-processing time.
-        for (size_t i = 0; i < num_elements_in_block; i++) {
+        for (size_t i = 0; i < static_cast<size_t>(num_elements_in_block); i++) {
             in.read(reinterpret_cast<char*>(&element_id), 4);
-            in.read(reinterpret_cast<char*>(tags.data()), 4 * num_tags);
-            in.read(reinterpret_cast<char*>(node_ids.data()), static_cast<int>(4 * n));
+            size_t tags_read_size = safe_math::safe_multiply(4, static_cast<size_t>(num_tags), "tags read");
+            in.read(reinterpret_cast<char*>(tags.data()), static_cast<std::streamsize>(tags_read_size));
+            size_t nodes_read_size = safe_math::safe_multiply(4, n, "nodes read");
+            in.read(reinterpret_cast<char*>(node_ids.data()), static_cast<std::streamsize>(nodes_read_size));
 
             min_tag = std::min(min_tag, element_id);
             max_tag = std::max(max_tag, element_id);

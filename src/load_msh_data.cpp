@@ -3,6 +3,7 @@
 #include <mshio/MshSpec.h>
 #include <mshio/exception.h>
 #include "io_utils.h"
+#include "safe_math.h"
 
 #include <cassert>
 #include <fstream>
@@ -19,18 +20,21 @@ void load_data_header(std::istream& in, DataHeader& header)
     size_t num_string_tags, num_real_tags, num_int_tags;
 
     in >> num_string_tags;
+    safe_math::validate_size(num_string_tags, "data header string tags");
     header.string_tags.resize(num_string_tags);
     for (size_t i = 0; i < num_string_tags; i++) {
         in >> std::quoted(header.string_tags[i]);
     }
 
     in >> num_real_tags;
+    safe_math::validate_size(num_real_tags, "data header real tags");
     header.real_tags.resize(num_real_tags);
     for (size_t i = 0; i < num_real_tags; i++) {
         in >> header.real_tags[i];
     }
 
     in >> num_int_tags;
+    safe_math::validate_size(num_int_tags, "data header int tags");
     header.int_tags.resize(num_int_tags);
     for (size_t i = 0; i < num_int_tags; i++) {
         in >> header.int_tags[i];
@@ -52,12 +56,21 @@ void load_data_entry(
     // in.read(reinterpret_cast<char*>(&entry.tag), sizeof(size_t));
     if (is_element_node_data) {
         in.read(reinterpret_cast<char*>(&entry.num_nodes_per_element), sizeof(int));
-        entry.data.resize(fields_per_entry * static_cast<size_t>(entry.num_nodes_per_element));
+        if (entry.num_nodes_per_element < 0) {
+            throw InvalidFormat("Negative num_nodes_per_element in element-node data");
+        }
+        size_t data_size = safe_math::safe_multiply(
+            fields_per_entry, 
+            static_cast<size_t>(entry.num_nodes_per_element),
+            "element-node data allocation");
+        entry.data.resize(data_size);
     } else {
+        safe_math::validate_size(fields_per_entry, "node/element data fields");
         entry.data.resize(fields_per_entry);
     }
+    size_t read_size = safe_math::safe_multiply(sizeof(double), entry.data.size(), "data read");
     in.read(reinterpret_cast<char*>(entry.data.data()),
-        static_cast<std::streamsize>(sizeof(double) * entry.data.size()));
+        static_cast<std::streamsize>(read_size));
 }
 } // namespace v41
 
@@ -71,13 +84,22 @@ void load_data_entry(
     if (is_element_node_data) {
         int32_t num_nodes_per_element;
         in.read(reinterpret_cast<char*>(&num_nodes_per_element), 4);
+        if (num_nodes_per_element < 0) {
+            throw InvalidFormat("Negative num_nodes_per_element in element-node data");
+        }
         entry.num_nodes_per_element = static_cast<int>(num_nodes_per_element);
-        entry.data.resize(fields_per_entry * static_cast<size_t>(entry.num_nodes_per_element));
+        size_t data_size = safe_math::safe_multiply(
+            fields_per_entry, 
+            static_cast<size_t>(entry.num_nodes_per_element),
+            "element-node data allocation");
+        entry.data.resize(data_size);
     } else {
+        safe_math::validate_size(fields_per_entry, "node/element data fields");
         entry.data.resize(fields_per_entry);
     }
+    size_t read_size = safe_math::safe_multiply(sizeof(double), entry.data.size(), "data read");
     in.read(reinterpret_cast<char*>(entry.data.data()),
-        static_cast<std::streamsize>(sizeof(double) * entry.data.size()));
+        static_cast<std::streamsize>(read_size));
 }
 } // namespace v22
 
@@ -93,8 +115,19 @@ void load_data(std::istream& in,
         throw InvalidFormat("Data requires at least 3 int tags.");
     }
 
+    if (data.header.int_tags[1] < 0) {
+        throw InvalidFormat("Negative fields_per_entry in data header");
+    }
+    if (data.header.int_tags[2] < 0) {
+        throw InvalidFormat("Negative num_entries in data header");
+    }
+
     size_t fields_per_entry = static_cast<size_t>(data.header.int_tags[1]);
     size_t num_entries = static_cast<size_t>(data.header.int_tags[2]);
+    
+    safe_math::validate_size(fields_per_entry, "data fields per entry");
+    safe_math::validate_size(num_entries, "data entries");
+    
     data.entries.resize(num_entries);
 
     if (is_binary) {
@@ -116,10 +149,18 @@ void load_data(std::istream& in,
             in >> entry.tag;
             if (is_element_node_data) {
                 in >> entry.num_nodes_per_element;
-                entry.data.resize(fields_per_entry * entry.num_nodes_per_element);
-                for (size_t j = 0; j < entry.num_nodes_per_element; j++) {
+                if (entry.num_nodes_per_element < 0) {
+                    throw InvalidFormat("Negative num_nodes_per_element in ASCII element-node data");
+                }
+                size_t data_size = safe_math::safe_multiply(
+                    fields_per_entry, 
+                    static_cast<size_t>(entry.num_nodes_per_element),
+                    "ASCII element-node data allocation");
+                entry.data.resize(data_size);
+                for (size_t j = 0; j < static_cast<size_t>(entry.num_nodes_per_element); j++) {
                     for (size_t k = 0; k < fields_per_entry; k++) {
-                        in >> entry.data[j * fields_per_entry + k];
+                        size_t index = safe_math::safe_multiply(j, fields_per_entry, "data index") + k;
+                        in >> entry.data[index];
                     }
                 }
             } else {
