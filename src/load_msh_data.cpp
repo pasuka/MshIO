@@ -159,8 +159,7 @@ void load_data(std::istream& in,
                 entry.data.resize(data_size);
                 for (size_t j = 0; j < static_cast<size_t>(entry.num_nodes_per_element); j++) {
                     for (size_t k = 0; k < fields_per_entry; k++) {
-                        size_t index = safe_math::safe_multiply(j, fields_per_entry, "data index") + k;
-                        in >> entry.data[index];
+                        in >> entry.data[j * fields_per_entry + k];
                     }
                 }
             } else {

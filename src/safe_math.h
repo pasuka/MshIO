@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <cstddef>
 
 namespace mshio {
@@ -19,12 +20,12 @@ inline bool would_multiply_overflow(size_t a, size_t b) {
 // Safe multiplication that throws on overflow
 inline size_t safe_multiply(size_t a, size_t b, const char* context = "multiplication") {
     if (would_multiply_overflow(a, b)) {
-        throw std::overflow_error(std::string("Integer overflow in ") + context);
+        throw std::overflow_error("Integer overflow in " + std::string(context));
     }
     size_t result = a * b;
     // Also check for unreasonably large allocations
     if (result > MAX_REASONABLE_SIZE) {
-        throw std::length_error(std::string("Allocation size too large in ") + context);
+        throw std::length_error("Allocation size too large in " + std::string(context));
     }
     return result;
 }
@@ -32,7 +33,7 @@ inline size_t safe_multiply(size_t a, size_t b, const char* context = "multiplic
 // Check if a value is reasonable for use as array size
 inline void validate_size(size_t size, const char* context = "size validation") {
     if (size > MAX_REASONABLE_SIZE) {
-        throw std::length_error(std::string("Size too large in ") + context);
+        throw std::length_error("Size too large in " + std::string(context));
     }
 }
 
@@ -40,7 +41,7 @@ inline void validate_size(size_t size, const char* context = "size validation") 
 template<typename T>
 inline size_t safe_cast_to_size_t(T value, const char* context = "cast") {
     if (value < 0) {
-        throw std::invalid_argument(std::string("Negative value in ") + context);
+        throw std::invalid_argument("Negative value in " + std::string(context));
     }
     return static_cast<size_t>(value);
 }

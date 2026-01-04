@@ -99,10 +99,7 @@ void load_nodes_binary(std::istream& in, MshSpec& spec)
             entries_per_node,
             "v4.1 binary node data allocation");
         block.data.resize(data_size);
-        size_t data_read_size = safe_math::safe_multiply(
-            safe_math::safe_multiply(sizeof(double), block.num_nodes_in_block, "node data read step 1"),
-            entries_per_node,
-            "node data read step 2");
+        size_t data_read_size = safe_math::safe_multiply(sizeof(double), data_size, "node data read");
         in.read(reinterpret_cast<char*>(block.data.data()),
             static_cast<std::streamsize>(data_read_size));
         assert(in.good());
